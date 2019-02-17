@@ -22,14 +22,43 @@ private_key = """
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/hapi-888%40black-terminus-231919.iam.gserviceaccount.com"
 }
 """
-
-
 # Allows to listen to specified tweets as they are posted
 import tweepy
 from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler, Stream, API, Cursor
 import twitter_credentials 
 
+AVG_SENTIMENT = 0.0
+MOST_POSITIVE_TWEET = ""
+MOST_NEGATIVE_TWEET = ""
+NUM_POS_TWEETS = 0
+NUM_NEG_TWEETS = 0
+NUM_TWEETS_OMITTED = 0
+MOST_POSITIVITY= -1
+MOST_NEGATIVITY = 1
+NUM_NEUTRAL = 0
+
+# Removes unecessary data from tweet
+def filter_tweet(tweet):
+    tweet_list = tweet.split(" ")
+    print("Original tweet_list: " + str(tweet_list))
+    removals = []
+    removal_count = 0
+    for token in tweet_list:
+        if len(token) == 0:
+            removal_count += 1
+            continue
+        if token == "RT" or token[0] == "@": 
+            removals.append(removal_count)
+        elif len(token) >= 5: 
+            if token[0:4] == "http":
+                removals.append(removal_count)
+        removal_count += 1
+    print("Removals: " + str(removals))
+    for ind in reversed(removals):
+        del tweet_list[ind]
+    print("Filtered tweet list: " + str(tweet_list))
+    return ' '.join(tweet_list)
 
 # For specific user interaction
 class TwitterClient():
@@ -40,11 +69,20 @@ class TwitterClient():
     
     # Gets specified number of tweets from user
     def get_tweets(self, num_tweets):
+        global NUM_TWEETS_OMITTED
         tweets = []
+        count = 0
         for tweet in Cursor(self.twitter_client.user_timeline, id=self.twitter_user).items(num_tweets):
-            if(tweet.lang == "en"):
-                tweets.append(tweet)
-        return tweets 
+            if(tweet.lang == "en" and len(tweet.text) != 0):
+                print("Original tweet: " + tweet.text)
+                filtered = filter_tweet(tweet.text)
+                print("Filtered tweet: " + filtered)
+                tweets.append(filtered)
+                count += 1
+            else:
+                print("Omitted Tweet: " + tweet.text)
+                NUM_TWEETS_OMITTED += 1
+        return tweets, count 
 
 # Class for general Twitter authentication
 class TwitterAuthenticator():
@@ -101,10 +139,19 @@ class TwitterListener(StreamListener):
 
 @app.route('/')
 def my_form():
-        return render_template('index.html')
+        return render_template('index.html', avg_sentiment = AVG_SENTIMENT, most_positive_tweet = MOST_POSITIVE_TWEET,
+                                            most_negative_tweet = MOST_NEGATIVE_TWEET, num_pos_tweets = NUM_POS_TWEETS,
+                                            num_neg_tweets = NUM_NEG_TWEETS, num_tweets_omitted = NUM_TWEETS_OMITTED)
 
 @app.route('/', methods=['POST'])
 def my_form_post():
+        global MOST_POSITIVITY
+        global MOST_NEGATIVITY
+        global NUM_NEG_TWEETS
+        global NUM_POS_TWEETS
+        global MOST_POSITIVE_TWEET
+        global MOST_NEGATIVE_TWEET
+        global NUM_NEUTRAL
         #Instantiates a client
         client = language.LanguageServiceClient(credentials=credentials)
 
@@ -117,32 +164,87 @@ def my_form_post():
             user = TwitterClient(text)
 
             # Retrieves past 200 tweets
-            tweets = user.get_tweets(50)
-
+            tweets,count = user.get_tweets(50)
+    
             for tweet in tweets:
                 # Future optimisation includes filtering all text for erroenous data
-                print(tweet.text)
-                document = types.Document(content=tweet.text, type=enums.Document.Type.PLAIN_TEXT)
-                overall_sentiment +=  (client.analyze_sentiment(document=document).document_sentiment).score
+                document = types.Document(content=tweet, type=enums.Document.Type.PLAIN_TEXT)
+                inc_sentiment = (client.analyze_sentiment(document=document).document_sentiment).score
+                if inc_sentiment > 0:
+                    NUM_POS_TWEETS += 1
+                elif inc_sentiment < 0:
+                    NUM_NEG_TWEETS += 1
+                elif inc_sentiment == 0:
+                    NUM_NEUTRAL += 1
+                if(inc_sentiment > MOST_POSITIVITY):
+                    MOST_POSITIVITY = inc_sentiment
+                    MOST_POSITIVE_TWEET = tweet
+                if(inc_sentiment < MOST_NEGATIVITY):
+                    MOST_NEGATIVITY = inc_sentiment
+                    MOST_NEGATIVE_TWEET = tweet
+                overall_sentiment += inc_sentiment
 
-            sentiment_score = overall_sentiment/50
-        
-            return str(sentiment_score) 
+            sentiment_score = overall_sentiment/count
+       
+            sentiment_percentage = 100 * sentiment_score
+            sentiment_print = ""
+            if sentiment_percentage < 0.0:
+                sentiment_print = str(sentiment_percentage) + "% Negative" 
+            else:
+                sentiment_print = str(sentiment_percentage) + "% Positive"
+
+            return_string = ("Average Sentiment: " + sentiment_print + "<br/>" + "Tweets Omitted: " + str(NUM_TWEETS_OMITTED) 
+                            + "<br/>" + "Most Positive Tweet: " + MOST_POSITIVE_TWEET + "<br/>" "Most Negative Tweet: " + MOST_NEGATIVE_TWEET 
+                            + "<br/>" + "Number of Positive Tweets: " + str(NUM_POS_TWEETS) + "<br/>" + "Number of Negative Tweets: " + str(NUM_NEG_TWEETS)
+                            + "<br/>" + "Number of Neutral Tweets: " + str(NUM_NEUTRAL))
+
+
+            return return_string 
         elif text[0] == "#":
             auth = tweepy.OAuthHandler(twitter_credentials.CONSUMER_KEY, twitter_credentials.CONSUMER_SECRET)
             auth.set_access_token(twitter_credentials.ACCESS_TOKEN, twitter_credentials.ACCESS_TOKEN_SECRET)
             api = tweepy.API(auth,wait_on_rate_limit=True)
-            for tweet in tweepy.Cursor(api.search,q=text,count=1,lang="en", since="2019-02-16").items(1):
+            tweets = []
+            for tweet in tweepy.Cursor(api.search,q=text,count=50,lang="en", since="2019-02-16").items(50):
                 # Future optimisation includes filtering all text for erroenous data
-                print("what")
-                print(tweet.text)
-                document = types.Document(content=tweet.text, type=enums.Document.Type.PLAIN_TEXT)
-                overall_sentiment +=  (client.analyze_sentiment(document=document).document_sentiment).score
+                if( tweet.lang == "en" and len(tweet.text) != 0):
+                    print("Original tweet: " + tweet.text)
+                    filtered = filter_tweet(tweet.text)
+                    print("Filtered tweet: " + filtered)
+                    tweets.append(filtered)
+            for tweet in tweets:
+                document = types.Document(content=tweet, type=enums.Document.Type.PLAIN_TEXT)
+                inc_sentiment = (client.analyze_sentiment(document=document).document_sentiment).score
+                if inc_sentiment > 0.0:
+                    NUM_POS_TWEETS += 1
+                elif inc_sentiment < 0.0:
+                    NUM_NEG_TWEETS += 1
+                elif inc_sentiment == 0.0:
+                    NUM_NEUTRAL += 1
+                    print("Neutral Tweet: " + tweet)
+                if(inc_sentiment > MOST_POSITIVITY):
+                    MOST_POSITIVITY = inc_sentiment
+                    MOST_POSITIVE_TWEET = tweet
+                if(inc_sentiment < MOST_NEGATIVITY):
+                    MOST_NEGATIVITY = inc_sentiment
+                    MOST_NEGATIVE_TWEET = tweet
+                overall_sentiment += inc_sentiment
+            
+            sentiment_score = overall_sentiment/count
+      
+            sentiment_percentage = 100 * sentiment_score
+            sentiment_print = ""
+            if sentiment_percentage < 0.0:
+                sentiment_print = str(sentiment_percentage) + "% Negative" 
+            else:
+                sentiment_print = str(sentiment_percentage) + "% Positive"
 
-            sentiment_score = overall_sentiment/1
-        
-            return str(sentiment_score) 
 
+            return_string = ("Average Sentiment: " + sentiment_print + "<br/>" + "Tweets Omitted: " + str(NUM_TWEETS_OMITTED) 
+                            + "<br/>" + "Most Positive Tweet: " + MOST_POSITIVE_TWEET + "<br/>" "Most Negative Tweet: " + MOST_NEGATIVE_TWEET 
+                            + "<br/>" + "Number of Positive Tweets: " + str(NUM_POS_TWEETS) + "<br/>" + "Number of Negative Tweets: " + str(NUM_NEG_TWEETS)
+                            + "<br/>" + "Number of Neutral Tweets: " + str(NUM_NEUTRAL))
+            return return_string
         else:
             print("Invalid input")
 
