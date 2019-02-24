@@ -4,29 +4,24 @@ from flask import Flask, request, render_template
 from google.cloud import language
 from google.cloud.language import enums
 from google.cloud.language import types
-
 from google.oauth2 import service_account
 
-private_key = """
-
-{
-  "type": "service_account",
-  "project_id": "black-terminus-231919",
-  "private_key_id": "9421a3be78c37c2049d918190297caa8bdd1fee4",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC1VsZbswNQ93dW\nz7NOnrkmaIyX3pVzaofPNdlgy1DXToLawnse3vU4yk5P6+8sKSz6zTbydjlBErjO\nwgfsF5Qe8x39vPSZhndH9DeNTq4ML1T62GQCyQJLOEUKhKBHqPEXg7320k396uBb\nbKUmwwgsYZdQBO0vJZ6/rb112Yki2klAv7M/lTTmjgMkD5pw+ZkKrS5Vn4WmNSTB\nV2WsgjIsfQyT99mqzKkTN6eeU5aYzxsLHVZLNa6AGNYqiZJFzOrdoTEos9Gxiy0C\nV+eCvJI0eoCroX2srlYZVKVLHLHalLJ/EfiW/ZQhi8honGe9gg2xG+JF6VZaGgX8\nw1ZYJDpzAgMBAAECggEAEG+vO/mI9+pDkVqdvycI03qPdREnjQC0vZXSawESsJPn\nrWoKRyfgpIdFu4hq3cmqT4iROJR5p7R0NsgEeCRCTd8tspAmwCbyzH1OGbXuIExG\nphPoq2NKchnwEWjTBEZuT897mjxr9Z4NPDbSmKWofylQpzVDGvkMdLA2kiYnqsEP\nH2FdriYUsNFeNdQJcBRGs0QyfRYyMCeclXkVHEtkgmpK6ymUPREa+9/cTpos3OYO\nsSiemieJ500iuEQzd/XnXkvW7g/hUEpR1/ld8YbQZasv/oHsdCBgto7hm4IEqLuH\nV1VEsp3kX0rIpFc/kjdZHYUR1wA7JsMl//b0ZaSMCQKBgQD7NIUsmuFLOmo8KMBW\nPaeIb7+pHo5Osd2srLc9RHSj+vcSYXdLVkNvgN6rGd9r+znEDeYqBizdCVLvKJL0\nU/6vjCc3yAKRvdzWx+BycPgHaI2xmupmTrCck8Dx6LM9+Zus3catTmMbcXv0SzIy\n6rovmKdEXq8WRsxH3EV5xlCQywKBgQC4zNzs0TP1jpoPuFHnxnFMOFeKfUcaIvWH\ngWTTJxPoABX9wTHPBqrhine4f5svQnWaQNs3J3FTFy74d0hNpiBnBheCtW9yaRO+\ngH1ACWGup0+bitNHLF2bV7m4EK5qA2YRMWsRtjNxVPTYipGJHxulqMU0vNp/cRrB\nZ5EaWfKP+QKBgQCfF/on78czv8E8bIqzk8Sg0jVORH3YNSmxjIlYkhxVJkKIL5Y/\n7lgzLCjZsD8hwjApjKvyfYq4Solt0gKQHwoz382OtGt8JgTROjFaCVXsSzlB/Fzr\ngna0E5elHb03SPhhGOwVIon9/XeFloIqYSKdtk5pLJYyw4/pCwYtQ34O1QKBgQCW\nZ43rZD0wvvYekzp+NCFkEnsVKO8kk41X0vUXcbee2+sKEyIRx/BuDj9wNtM7vJBw\nkhaYpg5yvOyqppJ/OBUpJGkgJcDl0iWSp4rJApmxB1UgV/Wq+K3az6RE7ba2a7u3\nhIwK50qpE6cPUoAupNXglyKh0I7YqFpJTJxpYQmtKQKBgG0//GI0/7OiV7HW8YuI\nS5XcVN2tmW2UiOewzsoTppqr33FS2P4p3vpyYSoxyAjJcHyXqxoVBz8cYUozeuJl\n0ra3xvAHnmu2b8t2klM7Sg98ACWF5EJge+I1hIvqFDVyTglUprW7oOYHgbzUWlWe\n6SEnKlkBSq+LVXa6vxgCrKuX\n-----END PRIVATE KEY-----\n",
-  "client_email": "hapi-888@black-terminus-231919.iam.gserviceaccount.com",
-  "client_id": "101811183768993227381",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/hapi-888%40black-terminus-231919.iam.gserviceaccount.com"
-}
-"""
 # Allows to listen to specified tweets as they are posted
 import tweepy
 from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler, Stream, API, Cursor
 import twitter_credentials 
+
+app = Flask(__name__)
+
+private_key = """
+{
+}
+
+"""
+info = json.loads(private_key, strict=False)
+credentials = service_account.Credentials.from_service_account_info(info)
+
 
 AVG_SENTIMENT = 0.0
 MOST_POSITIVE_TWEET = ""
@@ -37,6 +32,7 @@ NUM_TWEETS_OMITTED = 0
 MOST_POSITIVITY= -1
 MOST_NEGATIVITY = 1
 NUM_NEUTRAL = 0
+
 
 # Removes unecessary data from tweet
 def filter_tweet(tweet):
@@ -94,13 +90,6 @@ class TwitterAuthenticator():
         return auth
 
 
-info = json.loads(private_key, strict=False)
-credentials = service_account.Credentials.from_service_account_info(info)
-
-from google.cloud.language import types
-
-app = Flask(__name__)
-
 # Class for streaming and processing live tweets
 # ** Not currently in use 
 class TwitterStreamer():
@@ -136,6 +125,109 @@ class TwitterListener(StreamListener):
             return False
         print(status)
 
+"""
+    Absolutely abhorrent method that is only here because we don't understand
+    how flask works. Sorry
+"""
+def setGlobals():
+        global AVG_SENTIMENT
+        global MOST_POSITIVE_TWEET
+        global MOST_NEGATIVE_TWEET
+        global NUM_POS_TWEETS
+        global NUM_NEG_TWEETS
+        global NUM_TWEETS_OMITTED
+        global MOST_POSITIVITY
+        global MOST_NEGATIVITY
+        global NUM_NEUTRAL
+        AVG_SENTIMENT = 0.0
+        MOST_POSITIVE_TWEET = ""
+        MOST_NEGATIVE_TWEET = ""
+        NUM_POS_TWEETS = 0
+        NUM_NEG_TWEETS = 0
+        NUM_TWEETS_OMITTED = 0
+        MOST_POSITIVITY= -1
+        MOST_NEGATIVITY = 1
+        NUM_NEUTRAL = 0
+
+"""
+    Given the last several tweets from a user or hashtag, determine the
+    sentiment for each one to compute the overall sentiment of their tweets
+"""
+def get_overall_sentiment(tweets, client):
+    global NUM_POS_TWEETS
+    global NUM_NEG_TWEETS
+    global NUM_NEUTRAL
+    global MOST_POSITIVITY
+    global MOST_POSITIVE_TWEET
+    global MOST_NEGATIVITY
+    global MOST_NEGATIVE_TWEET
+
+    overall_sentiment = 0
+    for tweet in tweets:
+        # Future optimisation includes filtering all text for erroenous data
+        document = types.Document(content=tweet, type=enums.Document.Type.PLAIN_TEXT)
+        inc_sentiment = (client.analyze_sentiment(document=document).document_sentiment).score
+        if inc_sentiment > 0:
+            NUM_POS_TWEETS += 1
+        elif inc_sentiment < 0:
+            NUM_NEG_TWEETS += 1
+        elif inc_sentiment == 0:
+            NUM_NEUTRAL += 1
+        if(inc_sentiment > MOST_POSITIVITY):
+            MOST_POSITIVITY = inc_sentiment
+            MOST_POSITIVE_TWEET = tweet
+        if(inc_sentiment < MOST_NEGATIVITY):
+            MOST_NEGATIVITY = inc_sentiment
+            MOST_NEGATIVE_TWEET = tweet
+        overall_sentiment += inc_sentiment
+    return overall_sentiment
+
+"""
+    Given a hashtag and number of tweets, returns at most that many tweets
+    and however many tweets were considered
+"""
+def get_hashtag_tweets(num, hashtag):
+    auth = tweepy.OAuthHandler(twitter_credentials.CONSUMER_KEY, twitter_credentials.CONSUMER_SECRET)
+    auth.set_access_token(twitter_credentials.ACCESS_TOKEN, twitter_credentials.ACCESS_TOKEN_SECRET)
+    api = tweepy.API(auth,wait_on_rate_limit=True)
+    tweets = []
+    count = 0
+    for tweet in tweepy.Cursor(api.search,q=hashtag,count=50,lang="en", since="2019-02-16").items(50):
+        if( tweet.lang == "en" and len(tweet.text) != 0):
+            print("Original tweet: " + tweet.text)
+            filtered = filter_tweet(tweet.text)
+            print("Filtered tweet: " + filtered)
+            tweets.append(filtered)
+            count += 1
+    return tweets, count
+
+"""
+    Given the sentiment score for a set of tweets, formats the return string
+    with all necessary global statistics 
+"""
+def get_return_string(overall_sentiment, count):
+    global AVG_SENTIMENT
+    global MOST_POSITIVE_TWEET
+    global MOST_NEGATIVE_TWEET
+    global NUM_POS_TWEETS
+    global NUM_NEG_TWEETS
+    global NUM_TWEETS_OMITTED
+    global MOST_POSITIVITY
+    global MOST_NEGATIVITY
+    global NUM_NEUTRAL
+
+    sentiment_score = overall_sentiment/count
+    sentiment_percentage = 100 * sentiment_score
+    sentiment_print = ""
+    if sentiment_percentage < 0.0:
+        sentiment_print = str(sentiment_percentage*(-1)) + "% Negative" 
+    else:
+        sentiment_print = str(sentiment_percentage) + "% Positive"
+    return_string = ("Average Sentiment: " + sentiment_print + "<br/>" + "Tweets Omitted: " + str(NUM_TWEETS_OMITTED) 
+                        + "<br/>" + "Most Positive Tweet: " + MOST_POSITIVE_TWEET + "<br/>" "Most Negative Tweet: " + MOST_NEGATIVE_TWEET 
+                        + "<br/>" + "Number of Positive Tweets: " + str(NUM_POS_TWEETS) + "<br/>" + "Number of Negative Tweets: " + str(NUM_NEG_TWEETS)
+                        + "<br/>" + "Number of Neutral Tweets: " + str(NUM_NEUTRAL))
+    return return_string 
 
 @app.route('/')
 def my_form():
@@ -143,112 +235,45 @@ def my_form():
                                             most_negative_tweet = MOST_NEGATIVE_TWEET, num_pos_tweets = NUM_POS_TWEETS,
                                             num_neg_tweets = NUM_NEG_TWEETS, num_tweets_omitted = NUM_TWEETS_OMITTED)
 
+"""
+    Essentially the main method. Prompts the end user for a username or hashtag
+    then runs sentiment analysis on the last at most 50 tweets from that 
+    username or hashtag. Stores all important statistics for return.
+"""
 @app.route('/', methods=['POST'])
 def my_form_post():
-        global MOST_POSITIVITY
-        global MOST_NEGATIVITY
-        global NUM_NEG_TWEETS
-        global NUM_POS_TWEETS
-        global MOST_POSITIVE_TWEET
-        global MOST_NEGATIVE_TWEET
-        global NUM_NEUTRAL
-        #Instantiates a client
+        setGlobals()
+
+        # Instantiates a client
         client = language.LanguageServiceClient(credentials=credentials)
 
         # The text to analyze
         text = request.form['text']
         overall_sentiment = 0
 
+        # In the case of asked for user
         if text[0] == "@":
             # Creates twitter client from user name
             user = TwitterClient(text)
 
-            # Retrieves past 200 tweets
+            # Retrieves past 50 tweets
             tweets,count = user.get_tweets(50)
-    
-            for tweet in tweets:
-                # Future optimisation includes filtering all text for erroenous data
-                document = types.Document(content=tweet, type=enums.Document.Type.PLAIN_TEXT)
-                inc_sentiment = (client.analyze_sentiment(document=document).document_sentiment).score
-                if inc_sentiment > 0:
-                    NUM_POS_TWEETS += 1
-                elif inc_sentiment < 0:
-                    NUM_NEG_TWEETS += 1
-                elif inc_sentiment == 0:
-                    NUM_NEUTRAL += 1
-                if(inc_sentiment > MOST_POSITIVITY):
-                    MOST_POSITIVITY = inc_sentiment
-                    MOST_POSITIVE_TWEET = tweet
-                if(inc_sentiment < MOST_NEGATIVITY):
-                    MOST_NEGATIVITY = inc_sentiment
-                    MOST_NEGATIVE_TWEET = tweet
-                overall_sentiment += inc_sentiment
+   
+            # Gets overall sentiment from gathered tweets
+            overall_sentiment = get_overall_sentiment(tweets, client)
 
-            sentiment_score = overall_sentiment/count
-       
-            sentiment_percentage = 100 * sentiment_score
-            sentiment_print = ""
-            if sentiment_percentage < 0.0:
-                sentiment_print = str(sentiment_percentage) + "% Negative" 
-            else:
-                sentiment_print = str(sentiment_percentage) + "% Positive"
-
-            return_string = ("Average Sentiment: " + sentiment_print + "<br/>" + "Tweets Omitted: " + str(NUM_TWEETS_OMITTED) 
-                            + "<br/>" + "Most Positive Tweet: " + MOST_POSITIVE_TWEET + "<br/>" "Most Negative Tweet: " + MOST_NEGATIVE_TWEET 
-                            + "<br/>" + "Number of Positive Tweets: " + str(NUM_POS_TWEETS) + "<br/>" + "Number of Negative Tweets: " + str(NUM_NEG_TWEETS)
-                            + "<br/>" + "Number of Neutral Tweets: " + str(NUM_NEUTRAL))
-
-
-            return return_string 
+            return get_return_string(overall_sentiment, count)
+        # In the case of asked for hashtag
         elif text[0] == "#":
-            auth = tweepy.OAuthHandler(twitter_credentials.CONSUMER_KEY, twitter_credentials.CONSUMER_SECRET)
-            auth.set_access_token(twitter_credentials.ACCESS_TOKEN, twitter_credentials.ACCESS_TOKEN_SECRET)
-            api = tweepy.API(auth,wait_on_rate_limit=True)
-            tweets = []
-            for tweet in tweepy.Cursor(api.search,q=text,count=50,lang="en", since="2019-02-16").items(50):
-                # Future optimisation includes filtering all text for erroenous data
-                if( tweet.lang == "en" and len(tweet.text) != 0):
-                    print("Original tweet: " + tweet.text)
-                    filtered = filter_tweet(tweet.text)
-                    print("Filtered tweet: " + filtered)
-                    tweets.append(filtered)
-            for tweet in tweets:
-                document = types.Document(content=tweet, type=enums.Document.Type.PLAIN_TEXT)
-                inc_sentiment = (client.analyze_sentiment(document=document).document_sentiment).score
-                if inc_sentiment > 0.0:
-                    NUM_POS_TWEETS += 1
-                elif inc_sentiment < 0.0:
-                    NUM_NEG_TWEETS += 1
-                elif inc_sentiment == 0.0:
-                    NUM_NEUTRAL += 1
-                    print("Neutral Tweet: " + tweet)
-                if(inc_sentiment > MOST_POSITIVITY):
-                    MOST_POSITIVITY = inc_sentiment
-                    MOST_POSITIVE_TWEET = tweet
-                if(inc_sentiment < MOST_NEGATIVITY):
-                    MOST_NEGATIVITY = inc_sentiment
-                    MOST_NEGATIVE_TWEET = tweet
-                overall_sentiment += inc_sentiment
+            # Retrieves past 50 tweets
+            tweets, count = get_hashtag_tweets(50, text)
             
-            sentiment_score = overall_sentiment/count
-      
-            sentiment_percentage = 100 * sentiment_score
-            sentiment_print = ""
-            if sentiment_percentage < 0.0:
-                sentiment_print = str(sentiment_percentage) + "% Negative" 
-            else:
-                sentiment_print = str(sentiment_percentage) + "% Positive"
+            # Gets overall sentiment from gathered tweets
+            overall_sentiment = get_overall_sentiment(tweets, client)
 
-
-            return_string = ("Average Sentiment: " + sentiment_print + "<br/>" + "Tweets Omitted: " + str(NUM_TWEETS_OMITTED) 
-                            + "<br/>" + "Most Positive Tweet: " + MOST_POSITIVE_TWEET + "<br/>" "Most Negative Tweet: " + MOST_NEGATIVE_TWEET 
-                            + "<br/>" + "Number of Positive Tweets: " + str(NUM_POS_TWEETS) + "<br/>" + "Number of Negative Tweets: " + str(NUM_NEG_TWEETS)
-                            + "<br/>" + "Number of Neutral Tweets: " + str(NUM_NEUTRAL))
-            return return_string
+            return get_return_string(overall_sentiment, count)
         else:
             print("Invalid input")
 
-def main():
+if __name__ == "__main__":
     app.run(host='127.0.0.1', port=8080, debug=True)
-
-main()
